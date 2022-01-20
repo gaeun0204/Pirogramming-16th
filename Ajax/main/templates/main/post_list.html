@@ -1,0 +1,138 @@
+{% extends 'layout.html' %}
+{% load static %}
+
+{% block content %}
+<div class="main__container">
+	{% for post in posts %}
+	<div class="card post__container post-id-{{ post.id }}">
+		<div class="card-body">
+			<div class="post__img">
+				<img src="{% static 'img/img_lights.jpg' %}" alt="...">
+			</div>
+			<div class="card-title">{{ post.title }}</div>
+			<div class="card-text">{{ post.content}}</div>
+			<div class="btn btn-primary post__like" onclick="onClickLike({{ post.id }}, 'like')">Like {{ post.like }}</div>
+			<div class="btn btn-primary post__dislike" onclick="onClickLike({{ post.id }}, 'dislike')">
+				Dislike {{post.dislike}}
+			</div>
+			<!-- 프리티어가 자동으로 줄바꿈해서 생기는 문제.. 공백을 기준으로 자르려했는데 개행들어가면서 이상해짐. 해결법은 하단의 strip 함수 -->
+		</div>
+	</div>
+	{% endfor %}
+</div>
+{% endblock %}
+
+
+
+
+{% block extra %}
+
+{% comment %}
+<script> // 방식1: 바닐라자바스크립트
+	const strip = (string) => {
+		return string.replace(/^\s+|\s+$/g, ''); // 문자열 앞뒤의 공백들을 지우고 반환
+	};
+
+	const requestLike = new XMLHttpRequest();
+
+	const onClickLike = (id, type) => {
+		// 슬래시를 꼭 앞뒤로 붙여주기!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		const url = "/like_ajax/"; // 어떤 url로 서버에 요청할지
+		requestLike.open("POST", url, true); // open메소드로 POST방식으로 ajax기술 요청
+		requestLike.setRequestHeader(
+			"Content-Type",
+			"application/x-www-form-urlencoded"
+		);
+		requestLike.send(JSON.stringify({ id: id, type: type })); // JSON.stringify - JSON 스트링형태로 바꿔줘서 보낸다.
+	};
+
+	const likeHandleResponse = () => {
+		if (requestLike.status < 400) { // requestLike.status가 400 이상이면 에러다
+			const { id, type } = JSON.parse(requestLike.response); // Json.parse - 기존 JSon형태를 자바스크립트에 쓸수있는 형태로 변환해준다.
+			const element = document.querySelector(`.post-id-${id} .post__${type}`);
+			const originHTML = element.innerHTML; // 'like 0'
+
+			// const [buttonType, num] = originHTML.split(' '); // 프리티어는 이걸로하면 오류걸린다.
+			const [buttonType, num] = strip(originHTML).split(' '); // ['like 0']. strip으로 앞뒤의 공백들 지우고 내부에서 공백으로 잘라서 저장함!
+
+			const count = Number(num) + 1;
+			// views.py에서 post.like +=1한거는 데이터(DB)에만 반영돼서 html에서 보이는 값을 바꾸기 위해서 js에서 Number(num) + 1로 함!
+			element.innerHTML = `${buttonType} ${count}`; // 'like 1'
+		}
+	};
+
+
+	// requeststate가 바뀔때마다 자동으로 onreadystatechange 함수 호출함!
+	requestLike.onreadystatechange = () => {
+		if (requestLike.readyState === XMLHttpRequest.DONE) {
+			likeHandleResponse();
+		}
+	};
+</script>
+{% endcomment%}
+
+{%comment%}
+<script> // 방식2: Fetch API -> 요청하는 아래 코드 작성후, url 설정, 응답하는코드를 view에 (like_ajax함수) 써줘야함.
+	const strip = (string) => {
+		return string.replace(/^\s+|\s+$/g, ''); // 문자열 앞뒤의 공백들을 지우고 반환
+	};
+
+	const onClickLike = async (id, type) => { // async: 자바스크립트 동기지만, 이걸쓰는순간 비동기처리
+		const url = "/like_ajax/";
+		const res = await fetch(url, { // await: 부분적으로 동기처리 & 서버가 응답을 줄때까지 기다림 // fetch방식으로 요청을 보낸다.
+			method: 'POST', // 서버로부터 응답이 오면 아래코드들 실행
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded'
+			},
+			body: JSON.stringify({ id: id, type: type })
+		});
+		const { id: postId, type: button } = await res.json(); // {'id':1, 'type':'like'} -> postId=1, button='like'
+		// .json() - fetch로 반환된것(json형태)을 잘 쓸수있게 정리해주는 함수
+		// await 쓴 이유: 정리가 된 다음에 값을 넣어주기 위해
+
+		// 위의 코드와 비교할때, const { id, type } = JSON.parse(requestLike.response); 부분까지 구현한것!
+
+		likeHandleResponse(postId, button);
+	};
+
+	const likeHandleResponse = (id, type) => {
+		const element = document.querySelector(`.post-id-${id} .post__${type}`);
+		const originHTML = element.innerHTML; // 'like 0'
+		const [buttonType, num] = strip(originHTML).split(' '); // ['like 0']. strip으로 앞뒤의 공백들 지우고 내부에서 공백으로 잘라서 저장함!
+		const count = Number(num) + 1;
+
+		element.innerHTML = `${buttonType} ${count}`; // 'like 1'
+	};
+</script>
+{% endcomment%}
+
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script> // 방법3: Axios - 모듈설치 필요(CDN 사용도 가능)
+	const strip = (string) => {
+		return string.replace(/^\s+|\s+$/g, ''); // 문자열 앞뒤의 공백들을 지우고 반환
+	};
+
+	// Axios가 알아서 Json형식 바꿔줘서 따로 코드필요X
+	const onClickLike = async (id, type) => {
+		const url = "/like_ajax/";
+		const { data } = await axios.post(url, { // post로 요청보내고 await 응답올때까지 기다림
+			id, type
+		});
+		// console.log(data); // data = {'id':1, 'type':'like'} -> data.id, data.type으로 가져올 수 있다.
+		likeHandleResponse(data.id, data.type);
+	};
+
+	// view와 url 설정 후, 아래함수 작성
+
+	const likeHandleResponse = (id, type) => {
+		const element = document.querySelector(`.post-id-${id} .post__${type}`);
+		const originHTML = element.innerHTML; // 'like 0'
+		const [buttonType, num] = strip(originHTML).split(' '); // ['like 0']. strip으로 앞뒤의 공백들 지우고 내부에서 공백으로 잘라서 저장함!
+		const count = Number(num) + 1;
+
+		element.innerHTML = `${buttonType} ${count}`; // 'like 1'
+	};
+</script>
+
+{% endblock %}
